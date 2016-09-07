@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../../src/core/Version.js"],"names":[],"mappings":";;;;;;AAAA,IAAM,OAAO,GAAG,OAAO,CAAC;;AACjB,SAAS,gBAAgB,GAAG;AAC/B,WAAO,OAAO,CAAC;CAClB","file":"Version.js","sourcesContent":["const VERSION = '2.3.0';\nexport function getVersionString() {\n    return VERSION;\n}"]}
