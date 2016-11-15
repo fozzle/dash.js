@@ -80,14 +80,6 @@ function FragmentController() /*config*/{
         eventBus.on(_coreEventsEvents2['default'].FRAGMENT_LOADING_COMPLETED, onFragmentLoadingCompleted, instance);
     }
 
-    function process(bytes) {
-        var result = null;
-        if (bytes !== null && bytes !== undefined && bytes.byteLength > 0) {
-            result = new Uint8Array(bytes);
-        }
-        return result;
-    }
-
     function getModel(type) {
         var model = fragmentModels[type];
         if (!model) {
@@ -133,19 +125,18 @@ function FragmentController() /*config*/{
         var request = e.request;
         var bytes = e.response;
         var isInit = isInitializationRequest(request);
-        var streamId = scheduleController.getStreamProcessor().getStreamInfo().id;
+        var streamInfo = scheduleController.getStreamProcessor().getStreamInfo();
 
-        if (!bytes) {
-            log('No ' + request.mediaType + ' bytes to push.');
+        if (!bytes || !streamInfo) {
+            log('No ' + request.mediaType + ' bytes to push or stream is inactive.');
             return;
         }
 
-        var chunk = createDataChunk(bytes, request, streamId);
+        var chunk = createDataChunk(bytes, request, streamInfo.id);
         eventBus.trigger(isInit ? _coreEventsEvents2['default'].INIT_FRAGMENT_LOADED : _coreEventsEvents2['default'].MEDIA_FRAGMENT_LOADED, { chunk: chunk, fragmentModel: e.sender });
     }
 
     instance = {
-        process: process,
         getModel: getModel,
         isInitializationRequest: isInitializationRequest,
         reset: reset

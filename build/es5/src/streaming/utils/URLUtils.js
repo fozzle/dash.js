@@ -50,11 +50,76 @@ var _coreFactoryMaker2 = _interopRequireDefault(_coreFactoryMaker);
  */
 function URLUtils() {
 
-    var instance = undefined;
+    var resolveFunction = undefined;
 
     var absUrl = /^(?:(?:[a-z]+:)?\/)?\//i;
     var httpUrlRegex = /^https?:\/\//i;
     var originRegex = /^(https?:\/\/[^\/]+)\/?/i;
+
+    /**
+     * Resolves a url given an optional base url
+     * Uses window.URL to do the resolution.
+     *
+     * @param {string} url
+     * @param {string} [baseUrl]
+     * @return {string}
+     * @memberof module:URLUtils
+     * @instance
+     * @private
+     */
+    var nativeURLResolver = function nativeURLResolver(url, baseUrl) {
+        try {
+            // this will throw if baseurl is undefined, invalid etc
+            return new window.URL(url, baseUrl).toString();
+        } catch (e) {
+            return url;
+        }
+    };
+
+    /**
+     * Resolves a url given an optional base url
+     * Does not resolve ./, ../ etc but will do enough to construct something
+     * which will satisfy XHR etc when window.URL is not available ie
+     * IE11/node etc.
+     *
+     * @param {string} url
+     * @param {string} [baseUrl]
+     * @return {string}
+     * @memberof module:URLUtils
+     * @instance
+     * @private
+     */
+    var dumbURLResolver = function dumbURLResolver(url, baseUrl) {
+        var baseUrlParseFunc = parseBaseUrl;
+
+        if (!baseUrl) {
+            return url;
+        }
+
+        if (!isRelative(url)) {
+            if (isPathAbsolute(url)) {
+                baseUrlParseFunc = parseOrigin;
+            } else {
+                return url;
+            }
+        }
+
+        var base = baseUrlParseFunc(baseUrl);
+        var joinChar = base.charAt(base.length - 1) !== '/' && url.charAt(0) !== '/' ? '/' : '';
+
+        return [base, url].join(joinChar);
+    };
+
+    function setup() {
+        try {
+            var u = new window.URL('x', 'http://y'); //jshint ignore:line
+            resolveFunction = nativeURLResolver;
+        } catch (e) {
+            // must be IE11/Node etc
+        } finally {
+            resolveFunction = resolveFunction || dumbURLResolver;
+        }
+    }
 
     /**
      * Returns a string that contains the Base URL of a URL, if determinable.
@@ -64,16 +129,23 @@ function URLUtils() {
      * @instance
      */
     function parseBaseUrl(url) {
-        var base = '';
+        var slashIndex = url.indexOf('/');
+        var lastSlashIndex = url.lastIndexOf('/');
 
-        if (url.indexOf('/') !== -1) {
+        if (slashIndex !== -1) {
+            // if there is only '//'
+            if (lastSlashIndex === slashIndex + 1) {
+                return url;
+            }
+
             if (url.indexOf('?') !== -1) {
                 url = url.substring(0, url.indexOf('?'));
             }
-            base = url.substring(0, url.lastIndexOf('/') + 1);
+
+            return url.substring(0, lastSlashIndex + 1);
         }
 
-        return base;
+        return '';
     }
 
     /**
@@ -128,12 +200,27 @@ function URLUtils() {
         return httpUrlRegex.test(url);
     }
 
-    instance = {
+    /**
+     * Resolves a url given an optional base url
+     * @return {string}
+     * @param {string} url
+     * @param {string} [baseUrl]
+     * @memberof module:URLUtils
+     * @instance
+     */
+    function resolve(url, baseUrl) {
+        return resolveFunction(url, baseUrl);
+    }
+
+    setup();
+
+    var instance = {
         parseBaseUrl: parseBaseUrl,
         parseOrigin: parseOrigin,
         isRelative: isRelative,
         isPathAbsolute: isPathAbsolute,
-        isHTTPURL: isHTTPURL
+        isHTTPURL: isHTTPURL,
+        resolve: resolve
     };
 
     return instance;

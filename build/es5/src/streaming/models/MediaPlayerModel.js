@@ -126,7 +126,7 @@ function MediaPlayerModel() {
         bandwidthSafetyFactor = BANDWIDTH_SAFETY_FACTOR;
         abandonLoadTimeout = ABANDON_LOAD_TIMEOUT;
         wallclockTimeUpdateInterval = WALLCLOCK_TIME_UPDATE_INTERVAL;
-        xhrWithCredentials = DEFAULT_XHR_WITH_CREDENTIALS;
+        xhrWithCredentials = { 'default': DEFAULT_XHR_WITH_CREDENTIALS };
 
         retryAttempts = (_retryAttempts = {}, _defineProperty(_retryAttempts, _voMetricsHTTPRequest.HTTPRequest.MPD_TYPE, MANIFEST_RETRY_ATTEMPTS), _defineProperty(_retryAttempts, _voMetricsHTTPRequest.HTTPRequest.XLINK_EXPANSION_TYPE, XLINK_RETRY_ATTEMPTS), _defineProperty(_retryAttempts, _voMetricsHTTPRequest.HTTPRequest.MEDIA_SEGMENT_TYPE, FRAGMENT_RETRY_ATTEMPTS), _defineProperty(_retryAttempts, _voMetricsHTTPRequest.HTTPRequest.INIT_SEGMENT_TYPE, FRAGMENT_RETRY_ATTEMPTS), _defineProperty(_retryAttempts, _voMetricsHTTPRequest.HTTPRequest.BITSTREAM_SWITCHING_SEGMENT_TYPE, FRAGMENT_RETRY_ATTEMPTS), _defineProperty(_retryAttempts, _voMetricsHTTPRequest.HTTPRequest.INDEX_SEGMENT_TYPE, FRAGMENT_RETRY_ATTEMPTS), _defineProperty(_retryAttempts, _voMetricsHTTPRequest.HTTPRequest.OTHER_TYPE, FRAGMENT_RETRY_ATTEMPTS), _retryAttempts);
 
@@ -324,12 +324,24 @@ function MediaPlayerModel() {
         return UTCTimingSources;
     }
 
-    function setXHRWithCredentials(value) {
-        xhrWithCredentials = !!value;
+    function setXHRWithCredentialsForType(type, value) {
+        if (!type) {
+            Object.keys(xhrWithCredentials).forEach(function (key) {
+                setXHRWithCredentialsForType(key, value);
+            });
+        } else {
+            xhrWithCredentials[type] = !!value;
+        }
     }
 
-    function getXHRWithCredentials() {
-        return xhrWithCredentials;
+    function getXHRWithCredentialsForType(type) {
+        var useCreds = xhrWithCredentials[type];
+
+        if (useCreds === undefined) {
+            return xhrWithCredentials['default'];
+        }
+
+        return useCreds;
     }
 
     function getFastSwitchEnabled() {
@@ -392,8 +404,8 @@ function MediaPlayerModel() {
         getUseManifestDateHeaderTimeSource: getUseManifestDateHeaderTimeSource,
         setUTCTimingSources: setUTCTimingSources,
         getUTCTimingSources: getUTCTimingSources,
-        setXHRWithCredentials: setXHRWithCredentials,
-        getXHRWithCredentials: getXHRWithCredentials,
+        setXHRWithCredentialsForType: setXHRWithCredentialsForType,
+        getXHRWithCredentialsForType: getXHRWithCredentialsForType,
         setFastSwitchEnabled: setFastSwitchEnabled,
         getFastSwitchEnabled: getFastSwitchEnabled,
         reset: reset

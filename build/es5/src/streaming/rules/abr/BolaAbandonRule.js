@@ -123,7 +123,7 @@ function BolaAbandonRule(config) {
         var durationS = request.duration;
 
         var bufferLevel = dashMetrics.getCurrentBufferLevel(metrics) ? dashMetrics.getCurrentBufferLevel(metrics) : 0.0;
-        var effectiveBufferLevel = bufferLevel + bolaState.virtualBuffer;
+        var effectiveBufferLevel = bufferLevel + bolaState.placeholderBuffer;
 
         var estimateThroughput = 8 * bytesLoaded / (0.001 * elapsedTimeMs); // throughput in bits per second
         var estimateThroughputBSF = bolaState.bandwidthSafetyFactor * estimateThroughput;
@@ -221,6 +221,30 @@ function BolaAbandonRule(config) {
                 break;
             }
             --newQuality;
+        }
+
+        // deflate placeholder buffer - we want to be conservative after abandoning
+        var wantBufferLevel = NaN;
+        if (newQuality > 0) {
+            // deflate to point where score for newQuality is just getting better than for (newQuality - 1)
+            var u = bolaState.utilities[newQuality];
+            var u1 = bolaState.utilities[newQuality - 1];
+            var s = bolaState.bitrates[newQuality];
+            var s1 = bolaState.bitrates[newQuality - 1];
+            wantBufferLevel = bolaState.Vp * ((s * u1 - s1 * u) / (s - s1) + bolaState.gp);
+        } else {
+            // deflate to point where score for (newQuality + 1) is just getting better than for newQuality
+            var u = bolaState.utilities[0];
+            var u1 = bolaState.utilities[1];
+            var s = bolaState.bitrates[0];
+            var s1 = bolaState.bitrates[1];
+            wantBufferLevel = bolaState.Vp * ((s * u1 - s1 * u) / (s - s1) + bolaState.gp);
+            // then reduce one fragment duration to be conservative
+            wantBufferLevel -= durationS;
+        }
+        if (effectiveBufferLevel > wantBufferLevel) {
+            bolaState.placeholderBuffer = wantBufferLevel - bufferLevel;
+            if (bolaState.placeholderBuffer < 0) bolaState.placeholderBuffer = 0;
         }
 
         bolaState.lastQuality = newQuality;

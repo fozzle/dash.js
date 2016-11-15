@@ -57,7 +57,7 @@ var SegmentValuesMap = (function (_MapNode) {
 
         var commonProperties = ['SegmentBase', 'SegmentTemplate', 'SegmentList'];
 
-        return _get(Object.getPrototypeOf(SegmentValuesMap.prototype), 'constructor', this).call(this, 'Period', commonProperties, [new _MapNode3['default']('AdaptationSet', commonProperties, [new _MapNode3['default']('Representation', commonProperties)])]);
+        _get(Object.getPrototypeOf(SegmentValuesMap.prototype), 'constructor', this).call(this, 'Period', commonProperties, [new _MapNode3['default']('AdaptationSet', commonProperties, [new _MapNode3['default']('Representation', commonProperties)])]);
     }
 
     return SegmentValuesMap;

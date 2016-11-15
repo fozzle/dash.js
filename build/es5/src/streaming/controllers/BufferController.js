@@ -133,7 +133,7 @@ function BufferController(config) {
         bufferLevel = 0;
         criticalBufferLevel = Number.POSITIVE_INFINITY;
         maxAppendedIndex = 0;
-        lastIndex = 0;
+        lastIndex = Number.POSITIVE_INFINITY;
         buffer = null;
         bufferState = BUFFER_EMPTY;
         wallclockTicked = 0;
@@ -219,7 +219,7 @@ function BufferController(config) {
         var eventStreamMedia = adapter.getEventsFor(manifest, currentRepresentation.mediaInfo, streamProcessor);
         var eventStreamTrack = adapter.getEventsFor(manifest, currentRepresentation, streamProcessor);
 
-        if (eventStreamMedia.length > 0 || eventStreamTrack.length > 0) {
+        if (eventStreamMedia && eventStreamMedia.length > 0 || eventStreamTrack && eventStreamTrack.length > 0) {
             var request = streamProcessor.getFragmentModel().getRequests({
                 state: _modelsFragmentModel2['default'].FRAGMENT_MODEL_EXECUTED,
                 quality: quality,
@@ -293,7 +293,7 @@ function BufferController(config) {
     // START Buffer Level, State & Sufficiency Handling.
     //**********************************************************************
     function onPlaybackSeeking() {
-        lastIndex = 0;
+        lastIndex = Number.POSITIVE_INFINITY;
         isBufferingCompleted = false;
         onPlaybackProgression();
     }
@@ -316,7 +316,7 @@ function BufferController(config) {
     }
 
     function checkIfBufferingCompleted() {
-        var isLastIdxAppended = maxAppendedIndex === lastIndex - 1;
+        var isLastIdxAppended = maxAppendedIndex >= lastIndex - 1; // Handles 0 and non 0 based request index
         if (isLastIdxAppended && !isBufferingCompleted) {
             isBufferingCompleted = true;
             eventBus.trigger(_coreEventsEvents2['default'].BUFFERING_COMPLETED, { sender: instance, streamInfo: streamProcessor.getStreamInfo() });
@@ -406,6 +406,7 @@ function BufferController(config) {
 
     /* prune buffer on our own in background to avoid browsers pruning buffer silently */
     function pruneBuffer() {
+        if (!buffer) return;
         if (type === 'fragmentedText') return;
         var start = buffer.buffered.length ? buffer.buffered.start(0) : 0;
         var bufferToPrune = playbackController.getTime() - start - mediaPlayerModel.getBufferToKeep();
@@ -548,7 +549,7 @@ function BufferController(config) {
         criticalBufferLevel = Number.POSITIVE_INFINITY;
         bufferState = BUFFER_EMPTY;
         requiredQuality = _AbrController2['default'].QUALITY_DEFAULT;
-        lastIndex = 0;
+        lastIndex = Number.POSITIVE_INFINITY;
         maxAppendedIndex = 0;
         appendedBytesInfo = null;
         appendingMediaChunk = false;

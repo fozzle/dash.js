@@ -74,7 +74,7 @@ var _coreDebug = require('../../../core/Debug');
 var _coreDebug2 = _interopRequireDefault(_coreDebug);
 
 // BOLA_STATE_ONE_BITRATE   : If there is only one bitrate (or initialization failed), always return NO_CHANGE.
-// BOLA_STATE_STARTUP       : Set virtual buffer such that we download fragments at most recently measured throughput.
+// BOLA_STATE_STARTUP       : Set placeholder buffer such that we download fragments at most recently measured throughput.
 // BOLA_STATE_STEADY        : Buffer primed, we switch to steady operation.
 // TODO: add BOLA_STATE_SEEK and tune Bola behavior on seeking
 var BOLA_STATE_ONE_BITRATE = 0;
@@ -83,7 +83,7 @@ var BOLA_STATE_STEADY = 2;
 var BOLA_DEBUG = false; // TODO: remove
 
 var MINIMUM_BUFFER_S = 10; // BOLA should never add artificial delays if buffer is less than MINIMUM_BUFFER_S.
-var BUFFER_TARGET_S = 30; // If Schedule Controller does not allow buffer level to reach BUFFER_TARGET_S, this can be a virtual buffer level.
+var BUFFER_TARGET_S = 30; // If Schedule Controller does not allow buffer level to reach BUFFER_TARGET_S, this can be a placeholder buffer level.
 var REBUFFER_SAFETY_FACTOR = 0.5; // Used when buffer level is dangerously low, might happen often in live streaming.
 
 function BolaRule(config) {
@@ -99,6 +99,8 @@ function BolaRule(config) {
 
     var instance = undefined,
         lastCallTimeDict = undefined,
+        lastFragmentLoadedDict = undefined,
+        lastFragmentWasSwitchDict = undefined,
         eventMediaTypes = undefined,
         mediaPlayerModel = undefined,
         playbackController = undefined,
@@ -106,6 +108,8 @@ function BolaRule(config) {
 
     function setup() {
         lastCallTimeDict = {};
+        lastFragmentLoadedDict = {};
+        lastFragmentWasSwitchDict = {};
         eventMediaTypes = [];
         mediaPlayerModel = (0, _modelsMediaPlayerModel2['default'])(context).getInstance();
         playbackController = (0, _controllersPlaybackController2['default'])(context).getInstance();
@@ -113,6 +117,7 @@ function BolaRule(config) {
         eventBus.on(_coreEventsEvents2['default'].BUFFER_EMPTY, onBufferEmpty, instance);
         eventBus.on(_coreEventsEvents2['default'].PLAYBACK_SEEKING, onPlaybackSeeking, instance);
         eventBus.on(_coreEventsEvents2['default'].PERIOD_SWITCH_STARTED, onPeriodSwitchStarted, instance);
+        eventBus.on(_coreEventsEvents2['default'].MEDIA_FRAGMENT_LOADED, onMediaFragmentLoaded, instance);
     }
 
     function utilitiesFromBitrates(bitrates) {
@@ -122,30 +127,30 @@ function BolaRule(config) {
         // no need to worry about offset, any offset will be compensated for by gp
     }
 
-    // NOTE: in live streaming, the real buffer level can drop below minimumBufferS, but bola should not stick to lowest bitrate by using a virtual buffer level
+    // NOTE: in live streaming, the real buffer level can drop below minimumBufferS, but bola should not stick to lowest bitrate by using a placeholder buffer level
     function calculateParameters(minimumBufferS, bufferTargetS, bitrates, utilities) {
-        var highest_utility_index = NaN;
+        var highestUtilityIndex = NaN;
         if (!utilities) {
             utilities = utilitiesFromBitrates(bitrates);
-            highest_utility_index = utilities.length - 1;
+            highestUtilityIndex = utilities.length - 1;
         } else {
-            highest_utility_index = 0;
+            highestUtilityIndex = 0;
             utilities.forEach(function (u, i) {
-                if (u > utilities[highest_utility_index]) highest_utility_index = i;
+                if (u > utilities[highestUtilityIndex]) highestUtilityIndex = i;
             });
         }
 
-        if (highest_utility_index === 0) {
-            // if highest_utility_index === 0, then always use lowest bitrate
+        if (highestUtilityIndex === 0) {
+            // if highestUtilityIndex === 0, then always use lowest bitrate
             return null;
         }
 
         // TODO: Investigate if following can be better if utilities are not the default Math.log utilities.
         // If using Math.log utilities, we can choose Vp and gp to always prefer bitrates[0] at minimumBufferS and bitrates[max] at bufferTargetS.
-        // (Vp * (utility + gp) - buffer_level) / bitrate has the maxima described when:
+        // (Vp * (utility + gp) - bufferLevel) / bitrate has the maxima described when:
         // Vp * (utilities[0] + gp - 1) = minimumBufferS and Vp * (utilities[max] + gp - 1) = bufferTargetS
         // giving:
-        var gp = 1 - utilities[0] + (utilities[highest_utility_index] - utilities[0]) / (bufferTargetS / minimumBufferS - 1);
+        var gp = 1 - utilities[0] + (utilities[highestUtilityIndex] - utilities[0]) / (bufferTargetS / minimumBufferS - 1);
         var Vp = minimumBufferS / (utilities[0] + gp - 1);
 
         return { utilities: utilities, gp: gp, Vp: Vp };
@@ -189,7 +194,7 @@ function BolaRule(config) {
         initialState.bufferTarget = mediaPlayerModel.getStableBufferTime();
 
         initialState.lastQuality = 0;
-        initialState.virtualBuffer = 0;
+        initialState.placeholderBuffer = 0;
         initialState.throughputCount = isDynamic ? AVERAGE_THROUGHPUT_SAMPLE_AMOUNT_LIVE : AVERAGE_THROUGHPUT_SAMPLE_AMOUNT_VOD;
 
         if (BOLA_DEBUG) {
@@ -280,45 +285,54 @@ function BolaRule(config) {
         return q;
     }
 
-    function getDelayFromLastFragmentInSeconds(metrics, mediaType) {
-        var lastRequests = getLastHttpRequests(metrics, 1);
-        if (lastRequests.length === 0) {
-            return 0;
-        }
-        var lastRequest = lastRequests[0];
-        var nowMs = Date.now();
-        var lastRequestFinishMs = lastRequest._tfinish.getTime();
+    function getPlaceholderIncrementInSeconds(metrics, mediaType) {
+        // find out if there was delay because of
+        // 1. lack of availability in live streaming or
+        // 2. bufferLevel > bufferTarget or
+        // 3. fast switching
 
-        if (lastRequestFinishMs > nowMs) {
-            // this shouldn't happen, try to handle gracefully
-            lastRequestFinishMs = nowMs;
+        var nowMs = Date.now();
+        var lctMs = lastCallTimeDict[mediaType];
+        var wasSwitch = lastFragmentWasSwitchDict[mediaType];
+        var lastRequestFinishMs = NaN;
+
+        lastCallTimeDict[mediaType] = nowMs;
+        lastFragmentWasSwitchDict[mediaType] = false;
+
+        if (!wasSwitch) {
+            var lastRequests = getLastHttpRequests(metrics, 1);
+            if (lastRequests.length > 0) {
+                lastRequestFinishMs = lastRequests[0]._tfinish.getTime();
+                if (lastRequestFinishMs > nowMs) {
+                    // this shouldn't happen, try to handle gracefully
+                    lastRequestFinishMs = nowMs;
+                }
+            }
         }
 
         // return the time since the finish of the last request.
-        // The return will be added cumulatively to the virtual buffer, so we must be sure not to add the same delay twice.
+        // The return will be added cumulatively to the placeholder buffer, so we must be sure not to add the same delay twice.
 
-        var lctMs = lastCallTimeDict[mediaType];
-        lastCallTimeDict[mediaType] = nowMs;
         var delayMs = 0;
-        if (lctMs && lctMs > lastRequestFinishMs) {
+        if (wasSwitch || lctMs > lastRequestFinishMs) {
             delayMs = nowMs - lctMs;
         } else {
             delayMs = nowMs - lastRequestFinishMs;
         }
 
-        if (delayMs <= 0) return 0;
+        if (isNaN(delayMs) || delayMs <= 0) return 0;
         return 0.001 * delayMs;
     }
 
     function onBufferEmpty() {
         if (BOLA_DEBUG) log('BolaDebug BUFFER_EMPTY');
-        // if we rebuffer, we don't want the virtual buffer to artificially raise BOLA quality
+        // if we rebuffer, we don't want the placeholder buffer to artificially raise BOLA quality
         eventMediaTypes.forEach(function (mediaType) {
             var metrics = metricsModel.getReadOnlyMetricsFor(mediaType);
             if (metrics.BolaState.length !== 0) {
                 var bolaState = metrics.BolaState[0]._s;
                 if (bolaState.state === BOLA_STATE_STEADY) {
-                    bolaState.virtualBuffer = 0;
+                    bolaState.placeholderBuffer = 0;
                     metricsModel.updateBolaState(mediaType, bolaState);
                 }
             }
@@ -339,10 +353,30 @@ function BolaRule(config) {
                 metricsModel.updateBolaState(mediaType, bolaState);
             }
         });
+
+        lastFragmentLoadedDict = {};
+        lastFragmentWasSwitchDict = {};
     }
 
     function onPeriodSwitchStarted() {
         // TODO
+    }
+
+    function onMediaFragmentLoaded(e) {
+        if (e && e.chunk && e.chunk.mediaInfo) {
+            var type = e.chunk.mediaInfo.type;
+            var start = e.chunk.start;
+            if (type !== undefined && !isNaN(start)) {
+                if (start <= lastFragmentLoadedDict[type]) {
+                    lastFragmentWasSwitchDict[type] = true;
+                    // keep lastFragmentLoadedDict[type] e.g. last fragment start 10, switch fragment 8, last is still 10
+                } else {
+                        // isNaN(lastFragmentLoadedDict[type]) also falls here
+                        lastFragmentWasSwitchDict[type] = false;
+                        lastFragmentLoadedDict[type] = start;
+                    }
+            }
+        }
     }
 
     function execute(rulesContext, callback) {
@@ -411,24 +445,24 @@ function BolaRule(config) {
         var recentThroughput = getRecentThroughput(metrics, bolaState.throughputCount, mediaType);
 
         if (bufferLevel <= 0.1) {
-            // rebuffering occurred, reset virtual buffer
-            bolaState.virtualBuffer = 0;
+            // rebuffering occurred, reset placeholder buffer
+            bolaState.placeholderBuffer = 0;
         }
 
-        // find out if there was delay because of lack of availability or because buffer level > bufferTarget
-        var timeSinceLastDownload = getDelayFromLastFragmentInSeconds(metrics, mediaType);
-        if (timeSinceLastDownload > 0) {
+        // find out if there was delay because of lack of availability or because buffer level > bufferTarget or because of fast switching
+        var placeholderInc = getPlaceholderIncrementInSeconds(metrics, mediaType);
+        if (placeholderInc > 0) {
             // TODO: maybe we should set some positive threshold here
-            bolaState.virtualBuffer += timeSinceLastDownload;
+            bolaState.placeholderBuffer += placeholderInc;
         }
-        if (bolaState.virtualBuffer < 0) {
-            bolaState.virtualBuffer = 0;
+        if (bolaState.placeholderBuffer < 0) {
+            bolaState.placeholderBuffer = 0;
         }
 
-        var effectiveBufferLevel = bufferLevel + bolaState.virtualBuffer;
+        var effectiveBufferLevel = bufferLevel + bolaState.placeholderBuffer;
         var bolaQuality = getQualityFromBufferLevel(bolaState, effectiveBufferLevel);
 
-        if (BOLA_DEBUG) log('BolaDebug ' + mediaType + ' BolaRule bufferLevel=' + bufferLevel.toFixed(3) + '(+' + bolaState.virtualBuffer.toFixed(3) + '=' + effectiveBufferLevel.toFixed(3) + ') recentThroughput=' + (0.000001 * recentThroughput).toFixed(3) + ' tentativeQuality=' + bolaQuality);
+        if (BOLA_DEBUG) log('BolaDebug ' + mediaType + ' BolaRule bufferLevel=' + bufferLevel.toFixed(3) + '(+' + bolaState.placeholderBuffer.toFixed(3) + '=' + effectiveBufferLevel.toFixed(3) + ') recentThroughput=' + (0.000001 * recentThroughput).toFixed(3) + ' tentativeQuality=' + bolaQuality);
 
         if (bolaState.state === BOLA_STATE_STARTUP) {
             // in startup phase, use some throughput estimation
@@ -441,7 +475,7 @@ function BolaRule(config) {
 
                 var wantEffectiveBuffer = 0;
                 for (var i = 0; i < q; ++i) {
-                    // We want minimum effective buffer (bufferLevel + virtualBuffer) that gives a higher score for q when compared with any other i < q.
+                    // We want minimum effective buffer (bufferLevel + placeholderBuffer) that gives a higher score for q when compared with any other i < q.
                     // We want
                     //     (Vp * (utilities[q] + gp) - bufferLevel) / bitrates[q]
                     // to be >= any score for i < q.
@@ -452,7 +486,7 @@ function BolaRule(config) {
                     }
                 }
                 if (wantEffectiveBuffer > bufferLevel) {
-                    bolaState.virtualBuffer = wantEffectiveBuffer - bufferLevel;
+                    bolaState.placeholderBuffer = wantEffectiveBuffer - bufferLevel;
                 }
             }
 
@@ -501,18 +535,18 @@ function BolaRule(config) {
         var wantBufferLevel = bolaState.Vp * (utilities[bolaQuality] + bolaState.gp);
         delaySeconds = effectiveBufferLevel - wantBufferLevel;
         if (delaySeconds > 0) {
-            // First reduce virtual buffer.
-            // Note that this "delay" is the main mechanism of depleting virtualBuffer - the real buffer is depleted by playback.
-            if (delaySeconds > bolaState.virtualBuffer) {
-                delaySeconds -= bolaState.virtualBuffer;
-                bolaState.virtualBuffer = 0;
+            // First reduce placeholder buffer.
+            // Note that this "delay" is the main mechanism of depleting placeholderBuffer - the real buffer is depleted by playback.
+            if (delaySeconds > bolaState.placeholderBuffer) {
+                delaySeconds -= bolaState.placeholderBuffer;
+                bolaState.placeholderBuffer = 0;
             } else {
-                bolaState.virtualBuffer -= delaySeconds;
+                bolaState.placeholderBuffer -= delaySeconds;
                 delaySeconds = 0;
             }
         }
         if (delaySeconds > 0) {
-            // After depleting all virtual buffer, set delay.
+            // After depleting all placeholder buffer, set delay.
             if (bolaQuality === bitrates.length - 1) {
                 // At top quality, allow schedule controller to decide how far to fill buffer.
                 delaySeconds = 0;
@@ -540,6 +574,7 @@ function BolaRule(config) {
         eventBus.off(_coreEventsEvents2['default'].BUFFER_EMPTY, onBufferEmpty, instance);
         eventBus.off(_coreEventsEvents2['default'].PLAYBACK_SEEKING, onPlaybackSeeking, instance);
         eventBus.off(_coreEventsEvents2['default'].PERIOD_SWITCH_STARTED, onPeriodSwitchStarted, instance);
+        eventBus.off(_coreEventsEvents2['default'].MEDIA_FRAGMENT_LOADED, onMediaFragmentLoaded, instance);
         setup();
     }
 

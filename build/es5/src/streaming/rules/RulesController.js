@@ -48,16 +48,11 @@ var _abrABRRulesCollection = require('./abr/ABRRulesCollection');
 
 var _abrABRRulesCollection2 = _interopRequireDefault(_abrABRRulesCollection);
 
-var _synchronizationSynchronizationRulesCollection = require('./synchronization/SynchronizationRulesCollection');
-
-var _synchronizationSynchronizationRulesCollection2 = _interopRequireDefault(_synchronizationSynchronizationRulesCollection);
-
 var _coreFactoryMaker = require('../../core/FactoryMaker');
 
 var _coreFactoryMaker2 = _interopRequireDefault(_coreFactoryMaker);
 
 var ABR_RULE = 0;
-var SYNC_RULE = 1;
 
 function RulesController() {
 
@@ -75,10 +70,6 @@ function RulesController() {
 
         if (config.abrRulesCollection) {
             rules[ABR_RULE] = config.abrRulesCollection;
-        }
-
-        if (config.synchronizationRulesCollection) {
-            rules[SYNC_RULE] = config.synchronizationRulesCollection;
         }
     }
 
@@ -146,8 +137,7 @@ function RulesController() {
 
     function reset() {
         var abrRules = rules[ABR_RULE];
-        var synchronizationRules = rules[SYNC_RULE];
-        var allRules = (abrRules.getRules(_abrABRRulesCollection2['default'].QUALITY_SWITCH_RULES) || []).concat(abrRules.getRules(_abrABRRulesCollection2['default'].ABANDON_FRAGMENT_RULES) || []).concat(synchronizationRules.getRules(_synchronizationSynchronizationRulesCollection2['default'].TIME_SYNCHRONIZED_RULES) || []).concat(synchronizationRules.getRules(_synchronizationSynchronizationRulesCollection2['default'].BEST_GUESS_RULES) || []);
+        var allRules = (abrRules.getRules(_abrABRRulesCollection2['default'].QUALITY_SWITCH_RULES) || []).concat(abrRules.getRules(_abrABRRulesCollection2['default'].ABANDON_FRAGMENT_RULES) || []);
         var ln = allRules.length;
 
         var rule, i;
@@ -180,7 +170,6 @@ function RulesController() {
 RulesController.__dashjs_factory_name = 'RulesController';
 var factory = _coreFactoryMaker2['default'].getSingletonFactory(RulesController);
 factory.ABR_RULE = ABR_RULE;
-factory.SYNC_RULE = SYNC_RULE;
 exports['default'] = factory;
 module.exports = exports['default'];
 //# sourceMappingURL=RulesController.js.map

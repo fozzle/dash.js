@@ -56,6 +56,10 @@ var _externalsXml2json = require('../../../externals/xml2json');
 
 var _externalsXml2json2 = _interopRequireDefault(_externalsXml2json);
 
+var _matchersStringMatcher = require('./matchers/StringMatcher');
+
+var _matchersStringMatcher2 = _interopRequireDefault(_matchersStringMatcher);
+
 var _matchersDurationMatcher = require('./matchers/DurationMatcher');
 
 var _matchersDurationMatcher2 = _interopRequireDefault(_matchersDurationMatcher);
@@ -88,9 +92,19 @@ function DashParser() /*config*/{
         objectIron = undefined;
 
     function setup() {
-        matchers = [new _matchersDurationMatcher2['default'](), new _matchersDateTimeMatcher2['default'](), new _matchersNumericMatcher2['default']()];
+        matchers = [new _matchersDurationMatcher2['default'](), new _matchersDateTimeMatcher2['default'](), new _matchersNumericMatcher2['default'](), new _matchersStringMatcher2['default']() // last in list to take precedence over NumericMatcher
+        ];
 
-        converter = new _externalsXml2json2['default'](matchers, '', true);
+        converter = new _externalsXml2json2['default']({
+            escapeMode: false,
+            attributePrefix: '',
+            arrayAccessForm: 'property',
+            emptyNodeForm: 'object',
+            stripWhitespaces: false,
+            enableToStringFunc: false,
+            ignoreRoot: true,
+            matchers: matchers
+        });
 
         objectIron = new _externalsObjectiron2['default']([new _mapsRepresentationBaseValuesMap2['default'](), new _mapsSegmentValuesMap2['default']()]);
     }

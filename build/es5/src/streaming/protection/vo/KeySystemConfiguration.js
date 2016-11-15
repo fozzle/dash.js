@@ -37,7 +37,7 @@
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
-  value: true
+    value: true
 });
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
@@ -59,14 +59,18 @@ var KeySystemConfiguration =
  * @class
  */
 function KeySystemConfiguration(audioCapabilities, videoCapabilities, distinctiveIdentifier, persistentState, sessionTypes) {
-  _classCallCheck(this, KeySystemConfiguration);
+    _classCallCheck(this, KeySystemConfiguration);
 
-  this.initDataTypes = ['cenc'];
-  this.audioCapabilities = audioCapabilities;
-  this.videoCapabilities = videoCapabilities;
-  this.distinctiveIdentifier = distinctiveIdentifier;
-  this.persistentState = persistentState;
-  this.sessionTypes = sessionTypes;
+    this.initDataTypes = ['cenc'];
+    if (audioCapabilities && audioCapabilities.length) {
+        this.audioCapabilities = audioCapabilities;
+    }
+    if (videoCapabilities && videoCapabilities.length) {
+        this.videoCapabilities = videoCapabilities;
+    }
+    this.distinctiveIdentifier = distinctiveIdentifier;
+    this.persistentState = persistentState;
+    this.sessionTypes = sessionTypes;
 };
 
 exports['default'] = KeySystemConfiguration;

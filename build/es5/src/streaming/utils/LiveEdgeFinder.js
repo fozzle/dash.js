@@ -36,105 +36,39 @@ Object.defineProperty(exports, '__esModule', {
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
 
-var _rulesSynchronizationSynchronizationRulesCollection = require('../rules/synchronization/SynchronizationRulesCollection');
-
-var _rulesSynchronizationSynchronizationRulesCollection2 = _interopRequireDefault(_rulesSynchronizationSynchronizationRulesCollection);
-
-var _voError = require('../vo/Error');
-
-var _voError2 = _interopRequireDefault(_voError);
-
-var _coreEventBus = require('../../core/EventBus');
-
-var _coreEventBus2 = _interopRequireDefault(_coreEventBus);
-
-var _coreEventsEvents = require('../../core/events/Events');
-
-var _coreEventsEvents2 = _interopRequireDefault(_coreEventsEvents);
-
-var _rulesRulesController = require('../rules/RulesController');
-
-var _rulesRulesController2 = _interopRequireDefault(_rulesRulesController);
-
 var _coreFactoryMaker = require('../../core/FactoryMaker');
 
 var _coreFactoryMaker2 = _interopRequireDefault(_coreFactoryMaker);
 
-var LIVE_EDGE_NOT_FOUND_ERROR_CODE = 1;
-
+/**
+ *
+ * @returns {{initialize: initialize, getLiveEdge: getLiveEdge, reset: reset}|*}
+ * @constructor
+ */
 function LiveEdgeFinder() {
-
-    var context = this.context;
-    var eventBus = (0, _coreEventBus2['default'])(context).getInstance();
 
     var instance = undefined,
         timelineConverter = undefined,
-        streamProcessor = undefined,
-        rulesController = undefined,
-        isSearchStarted = undefined,
-        searchStartTime = undefined,
-        rules = undefined,
-        liveEdge = undefined,
-        ruleSet = undefined;
+        streamProcessor = undefined;
 
     function initialize(TimelineConverter, StreamProcessor) {
         timelineConverter = TimelineConverter;
         streamProcessor = StreamProcessor;
-        isSearchStarted = false;
-        searchStartTime = NaN;
-        liveEdge = null;
-        rulesController = (0, _rulesRulesController2['default'])(context).getInstance();
-        ruleSet = _rulesSynchronizationSynchronizationRulesCollection2['default'].BEST_GUESS_RULES;
-        eventBus.on(_coreEventsEvents2['default'].STREAM_INITIALIZED, onStreamInitialized, this);
-    }
-
-    function abortSearch() {
-        isSearchStarted = false;
-        searchStartTime = NaN;
     }
 
     function getLiveEdge() {
+        var representationInfo = streamProcessor.getCurrentRepresentationInfo();
+        var liveEdge = representationInfo.useCalculatedLiveEdgeTime ? timelineConverter.getExpectedLiveEdge() : representationInfo.DVRWindow.end;
         return liveEdge;
     }
 
     function reset() {
-        eventBus.off(_coreEventsEvents2['default'].STREAM_INITIALIZED, onStreamInitialized, this);
-        abortSearch();
-        liveEdge = null;
         timelineConverter = null;
         streamProcessor = null;
-        isSearchStarted = false;
-        searchStartTime = NaN;
-        ruleSet = null;
-        rulesController = null;
-    }
-
-    function onSearchCompleted(req) {
-        var searchTime = (new Date().getTime() - searchStartTime) / 1000;
-        liveEdge = req.value;
-        eventBus.trigger(_coreEventsEvents2['default'].LIVE_EDGE_SEARCH_COMPLETED, { liveEdge: liveEdge, searchTime: searchTime, error: liveEdge === null ? new _voError2['default'](LIVE_EDGE_NOT_FOUND_ERROR_CODE, 'live edge has not been found', null) : null });
-    }
-
-    function onStreamInitialized(e) {
-
-        if (!streamProcessor.isDynamic() || isSearchStarted || e.error) {
-            return;
-        }
-
-        ruleSet = timelineConverter.isTimeSyncCompleted() ? _rulesSynchronizationSynchronizationRulesCollection2['default'].TIME_SYNCHRONIZED_RULES : _rulesSynchronizationSynchronizationRulesCollection2['default'].BEST_GUESS_RULES;
-
-        rules = (0, _rulesSynchronizationSynchronizationRulesCollection2['default'])(context).getInstance().getRules(ruleSet);
-        isSearchStarted = true;
-        searchStartTime = new Date().getTime();
-
-        rulesController.applyRules(rules, streamProcessor, onSearchCompleted, null, function (currentValue, newValue) {
-            return newValue;
-        });
     }
 
     instance = {
         initialize: initialize,
-        abortSearch: abortSearch,
         getLiveEdge: getLiveEdge,
         reset: reset
     };
@@ -143,7 +77,6 @@ function LiveEdgeFinder() {
 }
 LiveEdgeFinder.__dashjs_factory_name = 'LiveEdgeFinder';
 var factory = _coreFactoryMaker2['default'].getSingletonFactory(LiveEdgeFinder);
-factory.LIVE_EDGE_NOT_FOUND_ERROR_CODE = LIVE_EDGE_NOT_FOUND_ERROR_CODE;
 exports['default'] = factory;
 module.exports = exports['default'];
 //# sourceMappingURL=LiveEdgeFinder.js.map

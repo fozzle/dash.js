@@ -88,6 +88,10 @@ var _coreEventsEvents = require('../../core/events/Events');
 
 var _coreEventsEvents2 = _interopRequireDefault(_coreEventsEvents);
 
+var _streamingMediaPlayerEvents = require('../../streaming/MediaPlayerEvents');
+
+var _streamingMediaPlayerEvents2 = _interopRequireDefault(_streamingMediaPlayerEvents);
+
 var _coreFactoryMaker = require('../../core/FactoryMaker');
 
 var _coreFactoryMaker2 = _interopRequireDefault(_coreFactoryMaker);
@@ -139,7 +143,6 @@ function RepresentationController() {
         eventBus.on(_coreEventsEvents2['default'].REPRESENTATION_UPDATED, onRepresentationUpdated, instance);
         eventBus.on(_coreEventsEvents2['default'].WALLCLOCK_TIME_UPDATED, onWallclockTimeUpdated, instance);
         eventBus.on(_coreEventsEvents2['default'].BUFFER_LEVEL_UPDATED, onBufferLevelUpdated, instance);
-        eventBus.on(_coreEventsEvents2['default'].LIVE_EDGE_SEARCH_COMPLETED, onLiveEdgeSearchCompleted, instance);
     }
 
     function setConfig(config) {
@@ -180,7 +183,6 @@ function RepresentationController() {
         eventBus.off(_coreEventsEvents2['default'].REPRESENTATION_UPDATED, onRepresentationUpdated, instance);
         eventBus.off(_coreEventsEvents2['default'].WALLCLOCK_TIME_UPDATED, onWallclockTimeUpdated, instance);
         eventBus.off(_coreEventsEvents2['default'].BUFFER_LEVEL_UPDATED, onBufferLevelUpdated, instance);
-        eventBus.off(_coreEventsEvents2['default'].LIVE_EDGE_SEARCH_COMPLETED, onLiveEdgeSearchCompleted, instance);
 
         data = null;
         dataIndex = -1;
@@ -311,7 +313,7 @@ function RepresentationController() {
         };
 
         updating = false;
-        eventBus.trigger(_coreEventsEvents2['default'].AST_IN_FUTURE, { delay: delay });
+        eventBus.trigger(_streamingMediaPlayerEvents2['default'].AST_IN_FUTURE, { delay: delay });
         setTimeout(update, delay);
     }
 
@@ -376,25 +378,6 @@ function RepresentationController() {
     function onWallclockTimeUpdated(e) {
         if (e.isDynamic) {
             updateAvailabilityWindow(e.isDynamic);
-        }
-    }
-
-    function onLiveEdgeSearchCompleted(e) {
-        if (e.error) return;
-
-        updateAvailabilityWindow(true);
-        indexHandler.updateRepresentation(currentRepresentation, false);
-
-        // we need to update checkTime after we have found the live edge because its initial value
-        // does not take into account clientServerTimeShift
-        var manifest = manifestModel.getValue();
-        var period = currentRepresentation.adaptation.period;
-        var streamInfo = streamController.getActiveStreamInfo();
-
-        if (streamInfo.isLast) {
-            period.mpd.checkTime = dashManifestModel.getCheckTime(manifest, period);
-            period.duration = dashManifestModel.getEndTimeForLastPeriod(manifestModel.getValue(), period) - period.start;
-            streamInfo.duration = period.duration;
         }
     }
 

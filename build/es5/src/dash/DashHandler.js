@@ -170,7 +170,7 @@ function DashHandler(config) {
             serviceLocation = baseURL.serviceLocation;
 
             if (destination) {
-                url += destination;
+                url = urlUtils.resolve(destination, url);
             }
         }
 
@@ -185,16 +185,15 @@ function DashHandler(config) {
     }
 
     function generateInitRequest(representation, mediaType) {
-        var request = new _streamingVoFragmentRequest2['default']();
-        var period, presentationStartTime;
 
-        period = representation.adaptation.period;
+        var request = new _streamingVoFragmentRequest2['default']();
+        var period = representation.adaptation.period;
+        var presentationStartTime = period.start;
 
         request.mediaType = mediaType;
         request.type = _streamingVoMetricsHTTPRequest.HTTPRequest.INIT_SEGMENT_TYPE;
         request.range = representation.range;
-        presentationStartTime = period.start;
-        request.availabilityStartTime = timelineConverter.calcAvailabilityStartTimeFromPresentationTime(presentationStartTime, representation.adaptation.period.mpd, isDynamic);
+        request.availabilityStartTime = timelineConverter.calcAvailabilityStartTimeFromPresentationTime(presentationStartTime, period.mpd, isDynamic);
         request.availabilityEndTime = timelineConverter.calcAvailabilityEndTimeFromPresentationTime(presentationStartTime + period.duration, period.mpd, isDynamic);
         request.quality = representation.index;
         request.mediaInfo = streamProcessor.getMediaInfo();
@@ -205,38 +204,25 @@ function DashHandler(config) {
     }
 
     function getInitRequest(representation) {
-        var request;
-
         if (!representation) return null;
-
-        request = generateInitRequest(representation, type);
-
-        //log("Got an initialization.");
-
+        var request = generateInitRequest(representation, type);
         return request;
     }
 
     function isMediaFinished(representation) {
-        var period = representation.adaptation.period;
-        var segmentInfoType = representation.segmentInfoType;
 
         var isFinished = false;
 
-        var sDuration, seg, fTime;
-
-        if (index < 0) {
-            isFinished = false;
-        } else if (isDynamic || index < representation.availableSegmentsNumber) {
-            seg = (0, _utilsSegmentsUtils.getSegmentByIndex)(index, representation);
-
-            if (seg) {
-                fTime = seg.presentationStartTime - period.start;
-                sDuration = representation.adaptation.period.duration;
-                log(representation.segmentInfoType + ': ' + fTime + ' / ' + sDuration);
-                isFinished = segmentInfoType === 'SegmentTimeline' && isDynamic ? false : fTime >= sDuration;
-            }
-        } else {
+        if (!isDynamic && index === representation.availableSegmentsNumber) {
             isFinished = true;
+        } else {
+            var seg = (0, _utilsSegmentsUtils.getSegmentByIndex)(index, representation);
+            if (seg) {
+                var time = seg.presentationStartTime - representation.adaptation.period.start;
+                var duration = representation.adaptation.period.duration;
+                log(representation.segmentInfoType + ': ' + time + ' / ' + duration);
+                isFinished = representation.segmentInfoType === 'SegmentTimeline' && isDynamic ? false : time >= duration;
+            }
         }
 
         return isFinished;
@@ -255,11 +241,10 @@ function DashHandler(config) {
         }
 
         if (isDynamic && isNaN(timelineConverter.getExpectedLiveEdge())) {
-            var lastIdx = segments.length - 1;
-            var lastSegment = segments[lastIdx];
+            var lastSegment = segments[segments.length - 1];
             var liveEdge = lastSegment.presentationStartTime;
             var metrics = metricsModel.getMetricsFor('stream');
-            // the last segment is supposed to be a live edge
+            // the last segment is the Expected, not calculated, live edge.
             timelineConverter.setExpectedLiveEdge(liveEdge);
             metricsModel.updateManifestUpdateInfo(dashMetrics.getCurrentManifestUpdate(metrics), { presentationStartTime: liveEdge });
         }

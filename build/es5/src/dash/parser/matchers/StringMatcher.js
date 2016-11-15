@@ -29,7 +29,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 /**
- * @classdesc a RepresentationBaseValuesMap type for input to objectiron
+ * @classdesc Matches and converts xs:string to string, but only for specific attributes on specific nodes
  */
 'use strict';
 
@@ -45,24 +45,64 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
 function _inherits(subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var _MapNode2 = require('./MapNode');
+var _BaseMatcher2 = require('./BaseMatcher');
 
-var _MapNode3 = _interopRequireDefault(_MapNode2);
+var _BaseMatcher3 = _interopRequireDefault(_BaseMatcher2);
 
-var RepresentationBaseValuesMap = (function (_MapNode) {
-    _inherits(RepresentationBaseValuesMap, _MapNode);
+var StringMatcher = (function (_BaseMatcher) {
+    _inherits(StringMatcher, _BaseMatcher);
 
-    function RepresentationBaseValuesMap() {
-        _classCallCheck(this, RepresentationBaseValuesMap);
+    function StringMatcher() {
+        _classCallCheck(this, StringMatcher);
 
-        var commonProperties = ['profiles', 'width', 'height', 'sar', 'frameRate', 'audioSamplingRate', 'mimeType', 'segmentProfiles', 'codecs', 'maximumSAPPeriod', 'startWithSAP', 'maxPlayoutRate', 'codingDependency', 'scanType', 'FramePacking', 'AudioChannelConfiguration', 'ContentProtection', 'EssentialProperty', 'SupplementalProperty', 'InbandEventStream'];
-
-        _get(Object.getPrototypeOf(RepresentationBaseValuesMap.prototype), 'constructor', this).call(this, 'AdaptationSet', commonProperties, [new _MapNode3['default']('Representation', commonProperties, [new _MapNode3['default']('SubRepresentation', commonProperties)])]);
+        _get(Object.getPrototypeOf(StringMatcher.prototype), 'constructor', this).call(this, function (attr, nodeName) {
+            var stringAttrsInElements = {
+                'MPD': ['id', 'profiles'],
+                'Period': ['id'],
+                'BaseURL': ['serviceLocation', 'byteRange'],
+                'SegmentBase': ['indexRange'],
+                'Initialization': ['range'],
+                'RepresentationIndex': ['range'],
+                'SegmentList': ['indexRange'],
+                'BitstreamSwitching': ['range'],
+                'SegmentURL': ['mediaRange', 'indexRange'],
+                'SegmentTemplate': ['indexRange', 'media', 'index', 'initialization', 'bitstreamSwitching'],
+                'AssetIdentifier': ['value', 'id'],
+                'EventStream': ['value'],
+                'AdaptationSet': ['profiles', 'mimeType', 'segmentProfiles', 'codecs', 'contentType'],
+                'FramePacking': ['value', 'id'],
+                'AudioChannelConfiguration': ['value', 'id'],
+                'ContentProtection': ['value', 'id'],
+                'EssentialProperty': ['value', 'id'],
+                'SupplementalProperty': ['value', 'id'],
+                'InbandEventStream': ['value', 'id'],
+                'Accessibility': ['value', 'id'],
+                'Role': ['value', 'id'],
+                'Rating': ['value', 'id'],
+                'Viewpoint': ['value', 'id'],
+                'ContentComponent': ['contentType'],
+                'Representation': ['id', 'dependencyId', 'mediaStreamStructureId'],
+                'Subset': ['id'],
+                'Metrics': ['metrics'],
+                'Reporting': ['value', 'id']
+            };
+            if (stringAttrsInElements.hasOwnProperty(nodeName)) {
+                var attrNames = stringAttrsInElements[nodeName];
+                if (attrNames !== undefined) {
+                    return attrNames.indexOf(attr.name) >= 0;
+                } else {
+                    return false;
+                }
+            }
+            return false;
+        }, function (str) {
+            return String(str);
+        });
     }
 
-    return RepresentationBaseValuesMap;
-})(_MapNode3['default']);
+    return StringMatcher;
+})(_BaseMatcher3['default']);
 
-exports['default'] = RepresentationBaseValuesMap;
+exports['default'] = StringMatcher;
 module.exports = exports['default'];
-//# sourceMappingURL=RepresentationBaseValuesMap.js.map
+//# sourceMappingURL=StringMatcher.js.map

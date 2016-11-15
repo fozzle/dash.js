@@ -98,6 +98,7 @@ function DashAdapter() {
     }
 
     function getAdaptationForMediaInfo(mediaInfo) {
+        if (!adaptations) return null;
         return adaptations[mediaInfo.streamInfo.id][mediaInfo.index];
     }
 
@@ -297,18 +298,16 @@ function DashAdapter() {
     }
 
     function getStreamsInfo(manifest) {
-        var streams = [];
-        var mpd, ln, i;
 
         if (!manifest) return null;
 
-        mpd = dashManifestModel.getMpd(manifest);
-        periods = dashManifestModel.getRegularPeriods(manifest, mpd);
-        mpd.checkTime = dashManifestModel.getCheckTime(manifest, periods[0]);
-        adaptations = {};
-        ln = periods.length;
+        var streams = [];
+        var mpd = dashManifestModel.getMpd(manifest);
 
-        for (i = 0; i < ln; i++) {
+        periods = dashManifestModel.getRegularPeriods(manifest, mpd);
+        adaptations = {};
+
+        for (var i = 0, ln = periods.length; i < ln; i++) {
             streams.push(convertPeriodToStreamInfo(manifest, periods[i]));
         }
 
@@ -317,7 +316,6 @@ function DashAdapter() {
 
     function getManifestInfo(manifest) {
         var mpd = dashManifestModel.getMpd(manifest);
-
         return convertMpdToManifestInfo(manifest, mpd);
     }
 
