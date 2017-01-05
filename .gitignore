@@ -14,8 +14,8 @@ _SpecRunner.html
 reports
 jsdoc
 dist
-build/temp
-build/es5
+#build/temp
+#build/es5
 coverage
 
 #################
